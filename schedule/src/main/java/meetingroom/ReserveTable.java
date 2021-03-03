@@ -15,6 +15,7 @@ public class ReserveTable {
         private String userId;
         private String status;
         private Integer floor;
+        private Integer score;
 //        private String startDate;
 //        private String startTime;
 
@@ -90,4 +91,11 @@ public class ReserveTable {
             this.userId = userId;
         }
 
+    public Integer getScore() {
+        return score;
+    }
+
+    public void setScore(Integer score) {
+        this.score = score;
+    }
 }

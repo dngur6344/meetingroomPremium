@@ -91,6 +91,20 @@ public class ReserveTableViewHandler {
             e.printStackTrace();
         }
     }
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenReserved_then_UPDATE_4 (@Payload Registered registered) {
+        try {
+            if (registered.isMe()) {
+                ReserveTable reserveTable = reserveTableRepository.findByRoomId(registered.getRoomId());
+                reserveTable.setScore(registered.getScore());
+                // view 객체에 이벤트의 eventDirectValue 를 set 함
+                // view 레파지 토리에 save
+                reserveTableRepository.save(reserveTable);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
 
     @StreamListener(KafkaProcessor.INPUT)
     @Transactional
