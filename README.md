@@ -524,37 +524,40 @@ kubectl get all
 
   
 ## 무정지 재배포
-- 먼저 무정지 재배포가 100% 되는 것인지 확인하기 위해서 Autoscaler 이나 CB 설정을 제거함
 - siege 로 배포작업 직전에 워크로드를 모니터링 함
 ```
 siege -c10 -t60S -r10 -v --content-type "application/json" 'http://52.231.13.109:8080/reserves POST {"userId":1, "roomId":"3"}'
 ```
 - Readiness가 설정되지 않은 yml 파일로 배포 진행  
 
-  <img width="871" alt="스크린샷 2021-02-28 오후 1 52 52" src="https://user-images.githubusercontent.com/33116855/109408363-4b62fd80-79cc-11eb-9014-638a09b545c1.png">
+  <img width="628" alt="스크린샷 2021-03-04 오후 7 05 26" src="https://user-images.githubusercontent.com/43164924/109947749-01a44b00-7d1d-11eb-81b8-fd1ea9aadbcf.png">
 
 ```
 kubectl apply -f deployment.yml
 ```
 
 - 아래 그림과 같이, Kubernetes가 준비가 되지 않은 delivery pod에 요청을 보내서 siege의 Availability 가 100% 미만으로 떨어짐 
+<img width="671" alt="스크린샷 2021-03-04 오후 7 05 33" src="https://user-images.githubusercontent.com/43164924/109947780-0b2db300-7d1d-11eb-86da-78f445fb2813.png">
 
-  <img width="480" alt="스크린샷 2021-02-28 오후 2 30 37" src="https://user-images.githubusercontent.com/33116855/109408933-97fd0780-79d1-11eb-8ec6-f17d44161eb5.png">
 
 - Readiness가 설정된 yml 파일로 배포 진행  
 
-  <img width="779" alt="스크린샷 2021-02-28 오후 2 32 51" src="https://user-images.githubusercontent.com/33116855/109408971-e4484780-79d1-11eb-8989-cd680e962eff.png">
+<img width="480" alt="스크린샷 2021-03-04 오후 7 09 14" src="https://user-images.githubusercontent.com/43164924/109947852-1e408300-7d1d-11eb-8078-32f0038e9251.png">
+
 
 ```
 kubectl apply -f deployment.yml
 ```
 - 배포 중 pod가 2개가 뜨고, 새롭게 띄운 pod가 준비될 때까지, 기존 pod가 유지됨을 확인  
-  
-  <img width="764" alt="스크린샷 2021-02-28 오후 2 34 54" src="https://user-images.githubusercontent.com/33116855/109408992-2b363d00-79d2-11eb-8024-07aeade9e928.png">
+  <img width="512" alt="스크린샷 2021-03-04 오후 7 06 57" src="https://user-images.githubusercontent.com/43164924/109947945-357f7080-7d1d-11eb-8b79-54f51da173d5.png">
+  <img width="562" alt="스크린샷 2021-03-04 오후 7 07 13" src="https://user-images.githubusercontent.com/43164924/109947964-39ab8e00-7d1d-11eb-827e-5f66e77d2955.png">
+  <img width="507" alt="스크린샷 2021-03-04 오후 7 07 24" src="https://user-images.githubusercontent.com/43164924/109947973-3c0de800-7d1d-11eb-838e-78869e29e5d5.png">
+
   
 - siege 가 중단되지 않고, Availability가 높아졌음을 확인하여 무정지 재배포가 됨을 확인함  
-  
-  <img width="507" alt="스크린샷 2021-02-28 오후 2 48 28" src="https://user-images.githubusercontent.com/33116855/109409209-093dba00-79d4-11eb-9793-d1a7cdbe55f0.png">
+  <img width="717" alt="스크린샷 2021-03-04 오후 7 06 43" src="https://user-images.githubusercontent.com/43164924/109948020-462fe680-7d1d-11eb-85a5-e71ce9cf2e83.png">
+
+
 
 
 ## 오토스케일 아웃
