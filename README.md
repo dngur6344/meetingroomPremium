@@ -448,73 +448,70 @@ viewer인 schedule 서비스를 별도로 구현하여 아래와 같이 view를 
 ## CI/CD 설정
 - git에서 소스 가져오기
 ```
-https://github.com/dngur6344/meetingroom
+https://github.com/dngur6344/meetingroomPremium
 ```
 - Build 하기
 ```
-cd /meetingroom
-cd conference
+cd meetingroomPremium/conference
 mvn package
 
-cd ..
-cd gateway
+cd meetingroomPremium/gateway
 mvn package
 
-cd ..
-cd reserve
+cd meetingroomPremium/reserve
 mvn package
 
-cd ..
-cd room
+cd meetingroomPremium/review
 mvn package
 
-cd ..
-cd schedule
+cd meetingroomPremium/room
+mvn package
+
+cd meetingroomPremium/schedule
 mvn package
 ```
 - Dockerlizing, ACR(Azure Container Registry에 Docker Image Push하기
 ```
-cd /meetingroom
-cd rental
-az acr build --registry meetingroomacr --image meetingroomacr.azurecr.io/conference:latest .
+cd meetingroomPremium/conference
+az acr build --registry meetingroompremiumacr --image meetingroompremiumacr.azurecr.io/conference:0.1 .
 
-cd ..
-cd gateway
-az acr build --registry meetingroomacr --image meetingroomacr.azurecr.io/gateway:latest .
+cd meetingroomPremium/gateway
+az acr build --registry meetingroompremiumacr --image meetingroompremiumacr.azurecr.io/gateway:0.1 .
 
-cd ..
-cd reserve
-az acr build --registry meetingroomacr --image meetingroomacr.azurecr.io/reserve:latest .
+cd meetingroomPremium/reserve
+az acr build --registry meetingroompremiumacr --image meetingroompremiumacr.azurecr.io/reserve:0.1 .
 
-cd ..
-cd room
-az acr build --registry meetingroomacr --image meetingroomacr.azurecr.io/room:latest .
+cd meetingroomPremium/review
+az acr build --registry meetingroompremiumacr --image meetingroompremiumacr.azurecr.io/review:0.1 .
 
-cd ..
-cd schedule
-az acr build --registry meetingroomacr --image meetingroomacr.azurecr.io/schedule:latest .
+cd meetingroomPremium/room
+az acr build --registry meetingroompremiumacr --image meetingroompremiumacr.azurecr.io/room:0.1 .
+
+cd meetingroomPremium/schedule
+az acr build --registry meetingroompremiumacr --image meetingroompremiumacr.azurecr.io/schedule:0.1 .
 ```
 
 - ACR에서 이미지 가져와서 Kubernetes에서 Deploy하기
 
 ```
-kubectl create deploy gateway --image=meetingroomacr.azurecr.io/gateway:latest
-kubectl create deploy conference --image=meetingroomacr.azurecr.io/conference:latest
-kubectl create deploy reserve --image=meetingroomacr.azurecr.io/reserve:latest
-kubectl create deploy room --image=meetingroomacr.azurecr.io/room:latest
-kubectl create deploy schedule --image=meetingroomacr.azurecr.io/schedule:latest
+kubectl create deploy conference --image=meetingroompremiumacr.azurecr.io/conference:0.1
+kubectl create deploy conference --image=meetingroompremiumacr.azurecr.io/gateway:0.1 
+kubectl create deploy conference --image=meetingroompremiumacr.azurecr.io/reserve:0.1 
+kubectl create deploy conference --image=meetingroompremiumacr.azurecr.io/review:0.1 
+kubectl create deploy conference --image=meetingroompremiumacr.azurecr.io/room:0.1
+kubectl create deploy conference --image=meetingroompremiumacr.azurecr.io/schedule:0.1
 kubectl get all
 ```
 
 - Kubectl Deploy 결과 확인  
-
-  <img width="556" alt="스크린샷 2021-02-28 오후 12 47 12" src="https://user-images.githubusercontent.com/33116855/109407331-52394280-79c3-11eb-8283-ba98b2899f69.png">
+  <img width="572" alt="스크린샷 2021-03-04 오후 6 07 23" src="https://user-images.githubusercontent.com/43164924/109939512-7c1c9d00-7d14-11eb-8701-7d2f9c93143a.png">
 
 - Kubernetes에서 서비스 생성하기 (Docker 생성이기에 Port는 8080이며, Gateway는 LoadBalancer로 생성)
 
 ```
 kubectl expose deploy conference --type="ClusterIP" --port=8080
 kubectl expose deploy reserve --type="ClusterIP" --port=8080
+kubectl expose deploy review --type="ClusterIP" --port=8080
 kubectl expose deploy room --type="ClusterIP" --port=8080
 kubectl expose deploy schedule --type="ClusterIP" --port=8080
 kubectl expose deploy gateway --type="LoadBalancer" --port=8080
@@ -522,8 +519,7 @@ kubectl get all
 ```
 
 - Kubectl Expose 결과 확인  
-
-  <img width="646" alt="스크린샷 2021-02-28 오후 12 47 50" src="https://user-images.githubusercontent.com/33116855/109407339-5feec800-79c3-11eb-9f3f-18d9d2b812f0.png">
+  <img width="674" alt="스크린샷 2021-03-04 오후 6 08 50" src="https://user-images.githubusercontent.com/43164924/109939724-aec69580-7d14-11eb-837f-ffad530fd08f.png">
 
 
   
