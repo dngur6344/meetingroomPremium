@@ -11,13 +11,13 @@
 7. 예약한 회의에 대해 예약 취소를 요청할 수 있다.
 8. 시작했던 회의를 종료한다.
 9. 종료한 사람이 해당 회의에 대한 리뷰를 작성한다.(premium)
-10. 리뷰가 작성되면, 시작이 되었던 예약내역이 예약 시스템에서 삭제가 된다.(premium)
+10. 리뷰가 작성되면, 회의시작이 되었던 예약내역의 예약 상태가 'Ended'로 변경된다.(premium)
 11. Schedule view에서 회의실에 따른 예약정보와 가장 최근에 등록된 리뷰를 볼 수 있다.(premium)
 
 ## 비기능적 요구사항
 1. 트랜잭션
   - 회의 시작을 요청할 때, 회의를 예약한 사람이 아니라면 회의를 시작하지 못하게 한다.(Sync 호출)
-  - 리뷰를 등록할 때, 실제로 존재하느 회의실인지 확인을 한다.(premium)(Sync 호출)
+  - 리뷰를 등록할 때, 실제로 존재하는 회의실인지 확인을 한다.(premium)(Sync 호출)
 2. 장애격리
   - 회의실 시스템이 수행되지 않더라도 예약취소, 사용자 확인, 회의 종료는 365일 24시간 받을 수 있어야 한다. (Async 호출)
   - 리뷰서비스가 실행 중이 아니더라도, 회의실 서비스에서 해당 회의실의 삭제는 언제든지 가능해야한다. (premium) (Async 호출)
@@ -33,10 +33,12 @@ https://workflowy.com/s/assessment/qJn45fBdVZn4atl3
 <img width="1086" alt="스크린샷 2021-02-25 오후 10 59 46" src="https://user-images.githubusercontent.com/43164924/109471758-8fc9c880-7ab4-11eb-8855-5e2e7d31328b.png">
 
 ### 완성된 프리미엄 모형
-<img width="1098" alt="스크린샷 2021-03-04 오전 9 49 54" src="https://user-images.githubusercontent.com/43164924/109894405-cb40de80-7cd0-11eb-8651-834a8a2e3da3.png">
+<img width="1111" alt="스크린샷 2021-03-04 오후 1 00 53" src="https://user-images.githubusercontent.com/43164924/109909761-fdab0580-7ce9-11eb-936d-cf84c8951bee.png">
+
 
 ### 1차 완성본에 대한 기능적/비기능적 요구사항을 커버하는지 검증
-<img width="1098" alt="스크린샷 2021-03-04 오전 9 49 54 복사본" src="https://user-images.githubusercontent.com/43164924/109894645-325e9300-7cd1-11eb-8015-876e1db7394c.png">
+<img width="1111" alt="스크린샷 2021-03-04 오후 1 00 53 복사본" src="https://user-images.githubusercontent.com/43164924/109909726-ef5ce980-7ce9-11eb-8a2b-0b87ea9be408.png">
+
     
     - 회의실이 등록이 된다. (7)
     - 회원이 회의실을 예약을 한다. (3 -> 6)
@@ -47,7 +49,7 @@ https://workflowy.com/s/assessment/qJn45fBdVZn4atl3
     - 시작했던 회의를 종료한다. (2 -> 6)
     - schedule 메뉴에서 회의실에 대한 예약 정보를 알 수 있다.(Room Service + Reserve Service + Reivew Service) (8)
     - 회원이 회의가 끝나고 리뷰를 등록할 때, 해당 회의실이 존재하는 회의실인지 확인한다.(10)
-    - 회의실 리뷰가 성공적으로 등록이 되었다면, 예약 서비스에서 해당 예약 내역(서비스가 시작하고 종료되었던)을 삭제한다.(11 -> 12)
+    - 회의실 리뷰가 성공적으로 등록이 되었다면, 예약 서비스에서 해당 예약 내역(서비스가 시작하고 종료되었던)의 상태를 'Ended'로 변경.(11 -> 12)
 
 ### 헥사고날 아키텍쳐 다이어그램 도출 (Polyglot)
 <img width="1374" alt="스크린샷 2021-03-04 오전 10 09 40" src="https://user-images.githubusercontent.com/43164924/109894988-d0eaf400-7cd1-11eb-9742-75abfbdc7fc1.png">
@@ -365,73 +367,82 @@ public interface RoomService {
 
 ## 비동기식 호출 (Pub/Sub 방식)
 
-- reserve 서비스 내 Reserve.java에서 아래와 같이 서비스 Pub 구현
+- review 서비스 내 Review.java에서 아래와 같이 서비스 Pub 구현
 
 ```java
 @Entity
-@Table(name="Reserve_table")
-public class Reserve {
+@Table(name="Review_table")
+public class Review {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
-    private String userId;
     private Long roomId;
-    private String status;
+    private String userId;
+    private Integer score;
+    private String comment;
+    private Long reserveId;
 
     //...
-
     @PostPersist
     public void onPostPersist(){
-        Reserved reserved = new Reserved();
-        BeanUtils.copyProperties(this, reserved);
-        reserved.publishAfterCommit();
+        Registered registered = new Registered();
+        BeanUtils.copyProperties(this, registered);
+        registered.publishAfterCommit();
     }
+    //...
 }
+
 ```
 
-- room 서비스 내 PolicyHandler.java 에서 아래와 같이 Sub 구현
+- reserve 서비스 내 PolicyHandler.java 에서 아래와 같이 Sub 구현
 
 ```java
 @Service
 public class PolicyHandler{
     @Autowired
-    RoomRepository roomRepository;
-
-    //...
+    ReserveRepository reserveRepository;
     @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverReserved_(@Payload Reserved reserved){
+    public void onStringEventListener(@Payload String eventString){
 
-        if(reserved.isMe()){
-            Optional<Room> room = roomRepository.findById(reserved.getRoomId());
-            System.out.println("##### listener  : " + reserved.toJson());
-            if (room.isPresent()){
-                room.get().setStatus("Reserved");//회의실이 예약됨.
-                roomRepository.save(room.get());
+    }
+    @StreamListener(KafkaProcessor.INPUT)
+    @Transactional
+    public void wheneverEnded_UpdateConference(@Payload Registered registered){
+
+        if(registered.isMe()){
+            System.out.println("##### listener  : " + registered.toJson());
+            Optional<Reserve> reserve=reserveRepository.findById(registered.getReserveId());
+            if(reserve.isPresent()){
+                reserve.get().setStatus("Ended");
+                reserveRepository.save(reserve.get());
             }
         }
     }
-  }
+}
 ```
 - 비동기 호출은 다른 서비스 하나가 비정상이어도 해당 메세지를 다른 메시지 큐에서 보관하고 있기에, 서비스가 다시 정상으로 돌아오게 되면 그 메시지를 처리하게 된다.
-  - reserve 서비스와 room 서비스가 둘 다 정상 작동을 하고 있을 경우, 이상이 없이 잘 된다. <img width="1116" alt="스크린샷 2021-03-01 오후 8 01 56" src="https://user-images.githubusercontent.com/43164924/109488499-fc4ec280-7ac8-11eb-9a52-77d6e4939417.png">
-  - room 서비스를 내렸다. <img width="298" alt="스크린샷 2021-03-01 오후 8 02 28" src="https://user-images.githubusercontent.com/43164924/109488553-0ffa2900-7ac9-11eb-8d08-1e7d7ea7aff3.png">
-  - reserve 서비스를 이용해 예약을 하여도 문제가 없이 동작한다. <img width="906" alt="스크린샷 2021-03-01 오후 8 03 47" src="https://user-images.githubusercontent.com/43164924/109488704-3e780400-7ac9-11eb-80ee-ad1714bf8991.png">
+  - reserve 서비스와 review 서비스가 둘 다 정상 작동을 하고 있을 경우, 이상이 없이 잘 된다. <img width="850" alt="스크린샷 2021-03-04 오후 1 11 17" src="https://user-images.githubusercontent.com/43164924/109910321-326b8c80-7ceb-11eb-8b5c-167f51dd573f.png">
+  - reserve 서비스를 내렸다. <img width="318" alt="스크린샷 2021-03-04 오전 10 58 09" src="https://user-images.githubusercontent.com/43164924/109899012-86b94100-7cd8-11eb-98f2-16af16b6cf65.png">
+  - review 서비스를 이용해 리뷰 등록을 하여도 문제가 없이 동작한다. <img width="850" alt="스크린샷 2021-03-04 오전 10 58 44" src="https://user-images.githubusercontent.com/43164924/109899063-99cc1100-7cd8-11eb-9f2b-85a5583a4ddb.png">
 
 ## CQRS
 
 viewer인 schedule 서비스를 별도로 구현하여 아래와 같이 view를 출력한다.
+- Added 수행 후 schedule (회의실 등록)
+<img width="850" alt="스크린샷 2021-03-04 오전 11 14 38" src="https://user-images.githubusercontent.com/43164924/109900492-d13bbd00-7cda-11eb-91e7-a9f3bf314050.png">
 - Reserved 수행 후 schedule (예약 진행)
-<img width="906" alt="스크린샷 2021-03-01 오후 8 07 43" src="https://user-images.githubusercontent.com/43164924/109489147-ccec8580-7ac9-11eb-86f4-24d7b6db92ac.png">
-
+<img width="850" alt="스크린샷 2021-03-04 오전 11 15 14" src="https://user-images.githubusercontent.com/43164924/109900550-e7497d80-7cda-11eb-9275-cf9a051afce2.png">
 - Ended 수행 후 schedule (회의 시작 후, 회의 종료)
-<img width="906" alt="스크린샷 2021-03-01 오후 8 08 49" src="https://user-images.githubusercontent.com/43164924/109489279-f2798f00-7ac9-11eb-8ee3-55ca97c0b27b.png">
-
+<img width="850" alt="스크린샷 2021-03-04 오전 11 32 31" src="https://user-images.githubusercontent.com/43164924/109902114-50ca8b80-7cdd-11eb-89cf-2d3c10391bf4.png">
+- Registered 수행 후 schedule (리뷰 등록)(premium)
+<img width="850" alt="스크린샷 2021-03-04 오후 1 22 28" src="https://user-images.githubusercontent.com/43164924/109911030-ace8dc00-7cec-11eb-89d2-e0221fdc3da2.png">
 - 다시 Reserved 수행 후 schedule (예약 진행)
-<img width="906" alt="스크린샷 2021-03-01 오후 8 09 26" src="https://user-images.githubusercontent.com/43164924/109489335-09b87c80-7aca-11eb-8db2-b56a049521c9.png">
-
+<img width="850" alt="스크린샷 2021-03-04 오후 1 23 24" src="https://user-images.githubusercontent.com/43164924/109911105-d0ac2200-7cec-11eb-9ff2-61882995f44a.png">
 - Canceled 수행 후 schedule (예약 취소)
-<img width="906" alt="스크린샷 2021-03-01 오후 8 10 53" src="https://user-images.githubusercontent.com/43164924/109489448-3c627500-7aca-11eb-8f63-894d2d78ece4.png">
+<img width="850" alt="스크린샷 2021-03-04 오후 1 24 20" src="https://user-images.githubusercontent.com/43164924/109911180-efaab400-7cec-11eb-86aa-98265cc917d2.png">
+- Deleted 수행 후 schedule (회의실 삭제)
+<img width="850" alt="스크린샷 2021-03-04 오후 1 18 01" src="https://user-images.githubusercontent.com/43164924/109910694-0ef51180-7cec-11eb-9aab-a38515e982b4.png">
 
 # 운영
 ## CI/CD 설정
