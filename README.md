@@ -75,7 +75,7 @@ https://workflowy.com/s/assessment/qJn45fBdVZn4atl3
     mvn spring-boot:run
   
 ## DDD의 적용
-**Room 서비스의 Room.java**
+**Review 서비스의 Review.java**
 
 ```java
 package meetingroom;
@@ -85,43 +85,97 @@ import org.springframework.beans.BeanUtils;
 import java.util.List;
 
 @Entity
-@Table(name="Room_table")
-public class Room {
+@Table(name="Review_table")
+public class Review {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
-    private String status;
-    private Integer floor;
+    private Long roomId;
+    private String userId;
+    private Integer score;
+    private String comment;
+    private Long reserveId;
 
+    @PrePersist
+    public void onPrePersist(){
+        RoomChecked roomChecked = new RoomChecked();
+        BeanUtils.copyProperties(this, roomChecked);
+        roomChecked.publishAfterCommit();
+
+        //Following code causes dependency to external APIs
+        // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
+
+        meetingroom.external.Room room = new meetingroom.external.Room();
+        room.setId(roomId);
+        // mappings goes here
+        String result=ReviewApplication.applicationContext.getBean(meetingroom.external.RoomService.class)
+            .search(room);
+        if(result.equals("valid")){
+            System.out.println("Success!");
+        }
+        else{
+            System.out.println("FAIL!! There is no room!!");
+            Exception ex = new Exception();
+            ex.notify();
+        }
+    }
     @PostPersist
     public void onPostPersist(){
-        Added added = new Added();
-        BeanUtils.copyProperties(this, added);
-        added.publishAfterCommit();
+        Registered registered = new Registered();
+        BeanUtils.copyProperties(this, registered);
+        registered.publishAfterCommit();
     }
+
+
     public Long getId() {
         return id;
     }
+
     public void setId(Long id) {
         this.id = id;
     }
-    public String getStatus() {
-        return status;
+    public Long getRoomId() {
+        return roomId;
     }
-    public void setStatus(String status) {
-        this.status = status;
+
+    public void setRoomId(Long roomId) {
+        this.roomId = roomId;
     }
-    public Integer getFloor() {
-        return floor;
+    public String getUserId() {
+        return userId;
     }
-    public void setFloor(Integer floor) {
-        this.floor = floor;
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+    public Integer getScore() {
+        return score;
+    }
+
+    public void setScore(Integer score) {
+        this.score = score;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
+
+    public Long getReserveId() {
+        return reserveId;
+    }
+
+    public void setReserveId(Long reserveId) {
+        this.reserveId = reserveId;
     }
 }
 ```
 
-**Room 서비스의 PolicyHandler.java**
+**Review 서비스의 PolicyHandler.java**
 ```java
 package meetingroom;
 
@@ -133,81 +187,42 @@ import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
+import javax.transaction.Transactional;
+import java.util.List;
 import java.util.Optional;
 
 @Service
 public class PolicyHandler{
     @Autowired
-    RoomRepository roomRepository;
-
+    ReviewRepository reviewRepository;
     @StreamListener(KafkaProcessor.INPUT)
     public void onStringEventListener(@Payload String eventString){
 
     }
 
     @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverCanceled_(@Payload Canceled canceled){
+    @Transactional
+    public void wheneverEnded_UpdateConference(@Payload Deleted deleted){
 
-        if(canceled.isMe()){
-            Optional<Room> room = roomRepository.findById(canceled.getRoomId());
-            System.out.println("##### listener  : " + canceled.toJson());
-            if (room.isPresent()){
-                room.get().setStatus("Available");//회의실 예약이 취소되어 예약이 가능해짐.
-                roomRepository.save(room.get());
-            }
-        }
-    }
-    @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverReserved_(@Payload Reserved reserved){
-
-        if(reserved.isMe()){
-            Optional<Room> room = roomRepository.findById(reserved.getRoomId());
-            System.out.println("##### listener  : " + reserved.toJson());
-            if (room.isPresent()){
-                room.get().setStatus("Reserved");//회의실이 예약됨.
-                roomRepository.save(room.get());
-            }
-        }
-    }
-    @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverUserChecked_(@Payload UserChecked userChecked){
-
-        if(userChecked.isMe()){
-            Optional<Room> room = roomRepository.findById(userChecked.getRoomId());
-            System.out.println("##### listener  : " + userChecked.toJson());
-            if(room.isPresent()){
-                room.get().setStatus("Started");//회의가 시작됨.
-                roomRepository.save(room.get());
-            }
-        }
-    }
-    @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverEnded_(@Payload Ended ended){
-
-        if(ended.isMe()){
-            Optional<Room> room = roomRepository.findById(ended.getRoomId());
-            System.out.println("##### listener  : " + ended.toJson());
-            if(room.isPresent()){
-                room.get().setStatus("Available");//회의가 종료됨.
-                roomRepository.save(room.get());
+        if(deleted.isMe()){
+            List<Review> reviewList = reviewRepository.findAllByRoomId(deleted.getId());
+            System.out.println("##### listener  : " + deleted.toJson());
+            for(Review review:reviewList){
+                reviewRepository.deleteById(review.getId());
             }
         }
     }
 
 }
-
 ```
 
 
 - 적용 후 REST API의 테스트를 통해 정상적으로 작동함을 알 수 있었다.
-- 회의실 등록(Added) 후 결과
+- 회의실 등록(Added)후 리뷰 등록(Registered) 결과
+<img width="850" alt="스크린샷 2021-03-04 오전 10 21 07" src="https://user-images.githubusercontent.com/43164924/109895867-57ec9c00-7cd3-11eb-8f8b-18fab4dd7648.png">
 
-<img width="1116" alt="스크린샷 2021-03-01 오후 6 38 24" src="https://user-images.githubusercontent.com/43164924/109479041-5184d700-7abd-11eb-84d6-782c4b94779e.png">
-
-
-- 회의 예약(Reserved) 후 결과
-
-<img width="1116" alt="스크린샷 2021-03-01 오후 6 37 36" src="https://user-images.githubusercontent.com/43164924/109478970-3ade8000-7abd-11eb-836a-e07a7b3dec80.png">
+- 회의실 삭제(Deleted) 후 결과 : 해당 회의실에 대한 리뷰도 삭제됨
+<img width="850" alt="스크린샷 2021-03-04 오전 10 23 26" src="https://user-images.githubusercontent.com/43164924/109896077-ab5eea00-7cd3-11eb-8936-3881c4937943.png">
 
 ## Gateway 적용
 API Gateway를 통해 마이크로 서비스들의 진입점을 하나로 진행하였다.
@@ -238,6 +253,10 @@ spring:
           uri: http://localhost:8084
           predicates:
             - Path= /reserveTables/**
+        - id: review
+          uri: http://localhost:8085
+          predicates:
+            - Path=/reviews/**
       globalcors:
         corsConfigurations:
           '[/**]':
@@ -273,6 +292,10 @@ spring:
           uri: http://schedule:8080
           predicates:
             - Path= /reserveTables/**
+        - id: review
+          uri: http://review:8080
+          predicates:
+            - Path=/reviews/**
       globalcors:
         corsConfigurations:
           '[/**]':
@@ -290,57 +313,55 @@ server:
 ```
 
 ## Polyglot Persistence
-- Conference 서비스의 경우, 다른 서비스들이 h2 저장소를 이용한 것과는 다르게 hsql을 이용하였다. 
+- Review 서비스의 경우, 다른 서비스들이 h2 저장소를 이용한 것과는 다르게 hsql을 이용하였다. 
 - 이 작업을 통해 서비스들이 각각 다른 데이터베이스를 사용하더라도 전체적인 기능엔 문제가 없음을, 즉 Polyglot Persistence를 충족하였다.
 
-<img width="446" alt="스크린샷 2021-03-01 오후 6 43 02" src="https://user-images.githubusercontent.com/43164924/109479663-f6071900-7abd-11eb-8c22-eda690cadea4.png">
+<img width="324" alt="스크린샷 2021-03-04 오전 10 26 35" src="https://user-images.githubusercontent.com/43164924/109896341-1c9e9d00-7cd4-11eb-8f93-98daccec6d53.png">
 
 ## 동기식 호출(Req/Res 방식)과 Fallback 처리
 
-- conference 서비스의 external/ReserveService.java 내에 예약한 사용자가 맞는지 확인하는 Service 대행 인터페이스(Proxy)를 FeignClient를 이용하여 구현하였다.
+- review 서비스의 external/RoomService.java 내에 리뷰를 작성하려는 회의실이 실제로 존재하는지 확인하는 Service 대행 인터페이스(Proxy)를 FeignClient를 이용하여 구현하였다.
 
 ```java
-@FeignClient(name="reserve", url="${api.reserve.url}")
-public interface ReserveService {
+@FeignClient(name="room", url="${api.room.url}")
+public interface RoomService {
 
-    @RequestMapping(method= RequestMethod.GET, path="/reserves/check")
-    public String userCheck(@RequestBody Reserve reserve);
+    @RequestMapping(method= RequestMethod.GET, path="/rooms/check")
+    public String search(@RequestBody Room room);
 
 }
 ```
-- conference 서비스의 Conference.java 내에 사용자 확인 후 결과에 따라 회의 시작을 진행할지, 진행하지 않을지 결정.(@PrePersist)
+- review 서비스의 Review.java 내에 회의실 존재 확인 후 결과에 따라 리뷰를 등록할지,등록하지 않을지 결정.(@PrePersist)
 ```java
 @PrePersist
     public void onPrePersist(){
-        /*Started started = new Started();
-        BeanUtils.copyProperties(this, started);
-        started.publishAfterCommit();*/
+        RoomChecked roomChecked = new RoomChecked();
+        BeanUtils.copyProperties(this, roomChecked);
+        roomChecked.publishAfterCommit();
 
         //Following code causes dependency to external APIs
         // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
 
-        meetingroom.external.Reserve reserve = new meetingroom.external.Reserve();
+        meetingroom.external.Room room = new meetingroom.external.Room();
+        room.setId(roomId);
         // mappings goes here
-        reserve.setId(reserveId);
-        reserve.setUserId(userId);
-        reserve.setRoomId(roomId);
-        String result = ConferenceApplication.applicationContext.getBean(meetingroom.external.ReserveService.class).userCheck(reserve);
-
+        String result=ReviewApplication.applicationContext.getBean(meetingroom.external.RoomService.class)
+            .search(room);
         if(result.equals("valid")){
             System.out.println("Success!");
         }
         else{
-            /// usercheck가 유효하지 않을 때 강제로 예외 발생
-                System.out.println("FAIL!! InCorrect User or Incorrect Resevation");
-                Exception ex = new Exception();
-                ex.notify();
+            System.out.println("FAIL!! There is no room!!");
+            Exception ex = new Exception();
+            ex.notify();
         }
     }
 ```
-- 동기식 호출에서는 호출 시간에 따른 커플링이 발생하여, Reserve 시스템에 장애가 나면 회의 시작을 할 수가 없다. (Reserve 시스템에서 예약한 사용자인지를 확인하므로)
-  - Reserve 서비스를 중지. <img width="316" alt="스크린샷 2021-03-01 오후 7 39 17" src="https://user-images.githubusercontent.com/43164924/109486134-d247d100-7ac5-11eb-897a-54091bb13381.png">
-  - conference 서비스에서 회의 시작 시 에러 발생. <img width="1116" alt="스크린샷 2021-03-01 오후 7 41 00" src="https://user-images.githubusercontent.com/43164924/109486323-0fac5e80-7ac6-11eb-99e2-0ee7cc1f86e8.png">
-  - reserve 서비스 재기동 후 다시 회의 시작 요청. <img width="1116" alt="스크린샷 2021-03-01 오후 7 44 31" src="https://user-images.githubusercontent.com/43164924/109486682-8d706a00-7ac6-11eb-81c8-980c0a612005.png">
+- 동기식 호출에서는 호출 시간에 따른 커플링이 발생하여, Room 시스템에 장애가 나면 리뷰 등록을 할 수가 없다. (Room 서비스에서 실제로 회의실이 존재하는지를 확인하므로)
+  - Room 서비스를 중지.<img width="334" alt="스크린샷 2021-03-04 오전 10 31 30" src="https://user-images.githubusercontent.com/43164924/109896733-cc740a80-7cd4-11eb-9855-9e9df5b868b3.png">
+  - Review 서비스에서 리뷰 등록 시 에러 발생. <img width="850" alt="스크린샷 2021-03-04 오전 10 32 18" src="https://user-images.githubusercontent.com/43164924/109896791-e877ac00-7cd4-11eb-97c9-00a026eadd20.png">
+  - Room 서비스 재기동 후 다시 리뷰 등록 요청. <img width="850" alt="스크린샷 2021-03-04 오전 10 33 43" src="https://user-images.githubusercontent.com/43164924/109896887-1b21a480-7cd5-11eb-8298-67424954d605.png">
+
 
 ## 비동기식 호출 (Pub/Sub 방식)
 
