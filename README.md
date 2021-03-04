@@ -10,24 +10,34 @@
 6. 예약한 사람이 아니면 회의를 시작할 수 없다.
 7. 예약한 회의에 대해 예약 취소를 요청할 수 있다.
 8. 시작했던 회의를 종료한다.
+9. 종료한 사람이 해당 회의에 대한 리뷰를 작성한다.(premium)
+10. 리뷰가 작성되면, 회의시작이 되었던 예약내역의 예약 상태가 'Ended'로 변경된다.(premium)
+11. Schedule view에서 회의실에 따른 예약정보와 가장 최근에 등록된 리뷰를 볼 수 있다.(premium)
 
 ## 비기능적 요구사항
 1. 트랜잭션
   - 회의 시작을 요청할 때, 회의를 예약한 사람이 아니라면 회의를 시작하지 못하게 한다.(Sync 호출)
+  - 리뷰를 등록할 때, 실제로 존재하는 회의실인지 확인을 한다.(premium)(Sync 호출)
 2. 장애격리
   - 회의실 시스템이 수행되지 않더라도 예약취소, 사용자 확인, 회의 종료는 365일 24시간 받을 수 있어야 한다. (Async 호출)
+  - 리뷰서비스가 실행 중이 아니더라도, 회의실 서비스에서 해당 회의실의 삭제는 언제든지 가능해야한다. (premium) (Async 호출)
+  - 예약서비스가 실행 중이 아니더라도, 회의실 리뷰가 등록은 언제든지 가능해야한다. (premium) (Async 호출)
 3. 성능
-  - 회의실 현황에 대해 예약 상황을 별도로 확인할 수 있어야 한다.(CQRS)
+  - 회의실 현황에 대해 예약 상황 및 가장 최근 리뷰를 별도로 확인할 수 있어야 한다.(CQRS)
 
 # 체크포인트
 https://workflowy.com/s/assessment/qJn45fBdVZn4atl3
 
 ## EventStorming 결과
-### 완성된 1차 모형
+### 완성된 1차 모형(기존)
 <img width="1086" alt="스크린샷 2021-02-25 오후 10 59 46" src="https://user-images.githubusercontent.com/43164924/109471758-8fc9c880-7ab4-11eb-8855-5e2e7d31328b.png">
 
+### 완성된 프리미엄 모형
+<img width="1111" alt="스크린샷 2021-03-04 오후 1 00 53" src="https://user-images.githubusercontent.com/43164924/109909761-fdab0580-7ce9-11eb-936d-cf84c8951bee.png">
+
+
 ### 1차 완성본에 대한 기능적/비기능적 요구사항을 커버하는지 검증
-<img width="1040" alt="스크린샷 2021-03-01 오후 5 41 29" src="https://user-images.githubusercontent.com/43164924/109587219-08c72f80-7b4a-11eb-9863-8336c89c3583.png">
+<img width="1111" alt="스크린샷 2021-03-04 오후 1 00 53 복사본" src="https://user-images.githubusercontent.com/43164924/109909726-ef5ce980-7ce9-11eb-8a2b-0b87ea9be408.png">
 
     
     - 회의실이 등록이 된다. (7)
@@ -37,28 +47,37 @@ https://workflowy.com/s/assessment/qJn45fBdVZn4atl3
       - 예약한 사람이 아니면 회의 시작을 못한다. (1)
     - 회원이 예약한 회의실을 예약 취소한다. (4 -> 6)
     - 시작했던 회의를 종료한다. (2 -> 6)
-    - schedule 메뉴에서 회의실에 대한 예약 정보를 알 수 있다.(Room Service + Reserve Service) (8)
+    - schedule 메뉴에서 회의실에 대한 예약 정보를 알 수 있다.(Room Service + Reserve Service + Reivew Service) (8)
+    - 회원이 회의가 끝나고 리뷰를 등록할 때, 해당 회의실이 존재하는 회의실인지 확인한다.(10)
+    - 회의실 리뷰가 성공적으로 등록이 되었다면, 예약 서비스에서 해당 예약 내역(서비스가 시작하고 종료되었던)의 상태를 'Ended'로 변경.(11 -> 12)
 
 ### 헥사고날 아키텍쳐 다이어그램 도출 (Polyglot)
-<img width="1175" alt="스크린샷 2021-03-02 오후 5 22 57" src="https://user-images.githubusercontent.com/43164924/109619289-f1a13580-7b7b-11eb-9be7-52ebb60f114a.png">
+<img width="1374" alt="스크린샷 2021-03-04 오전 10 09 40" src="https://user-images.githubusercontent.com/43164924/109894988-d0eaf400-7cd1-11eb-9742-75abfbdc7fc1.png">
+
 
 # 구현
 도출해낸 헥사고날 아키텍처에 맞게, 로컬에서 SpringBoot를 이용해 Maven 빌드 하였다. 각각의 포트넘버는 8081 ~ 8084, 8088 이다.
 
     cd conference
     mvn spring-boot:run
-    
-    cd gateway
-    mvn spring-boot:run
-    
+
     cd reserve
     mvn spring-boot:run
     
     cd schedule
     mvn spring-boot:run
+    
+    cd room
+    mvn spring-boot:run
+    
+    cd review
+    mvn spring-boot:run
+    
+    cd gateway
+    mvn spring-boot:run
   
 ## DDD의 적용
-**Room 서비스의 Room.java**
+**Review 서비스의 Review.java**
 
 ```java
 package meetingroom;
@@ -68,43 +87,97 @@ import org.springframework.beans.BeanUtils;
 import java.util.List;
 
 @Entity
-@Table(name="Room_table")
-public class Room {
+@Table(name="Review_table")
+public class Review {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
-    private String status;
-    private Integer floor;
+    private Long roomId;
+    private String userId;
+    private Integer score;
+    private String comment;
+    private Long reserveId;
 
+    @PrePersist
+    public void onPrePersist(){
+        RoomChecked roomChecked = new RoomChecked();
+        BeanUtils.copyProperties(this, roomChecked);
+        roomChecked.publishAfterCommit();
+
+        //Following code causes dependency to external APIs
+        // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
+
+        meetingroom.external.Room room = new meetingroom.external.Room();
+        room.setId(roomId);
+        // mappings goes here
+        String result=ReviewApplication.applicationContext.getBean(meetingroom.external.RoomService.class)
+            .search(room);
+        if(result.equals("valid")){
+            System.out.println("Success!");
+        }
+        else{
+            System.out.println("FAIL!! There is no room!!");
+            Exception ex = new Exception();
+            ex.notify();
+        }
+    }
     @PostPersist
     public void onPostPersist(){
-        Added added = new Added();
-        BeanUtils.copyProperties(this, added);
-        added.publishAfterCommit();
+        Registered registered = new Registered();
+        BeanUtils.copyProperties(this, registered);
+        registered.publishAfterCommit();
     }
+
+
     public Long getId() {
         return id;
     }
+
     public void setId(Long id) {
         this.id = id;
     }
-    public String getStatus() {
-        return status;
+    public Long getRoomId() {
+        return roomId;
     }
-    public void setStatus(String status) {
-        this.status = status;
+
+    public void setRoomId(Long roomId) {
+        this.roomId = roomId;
     }
-    public Integer getFloor() {
-        return floor;
+    public String getUserId() {
+        return userId;
     }
-    public void setFloor(Integer floor) {
-        this.floor = floor;
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+    public Integer getScore() {
+        return score;
+    }
+
+    public void setScore(Integer score) {
+        this.score = score;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
+
+    public Long getReserveId() {
+        return reserveId;
+    }
+
+    public void setReserveId(Long reserveId) {
+        this.reserveId = reserveId;
     }
 }
 ```
 
-**Room 서비스의 PolicyHandler.java**
+**Review 서비스의 PolicyHandler.java**
 ```java
 package meetingroom;
 
@@ -116,81 +189,42 @@ import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
+import javax.transaction.Transactional;
+import java.util.List;
 import java.util.Optional;
 
 @Service
 public class PolicyHandler{
     @Autowired
-    RoomRepository roomRepository;
-
+    ReviewRepository reviewRepository;
     @StreamListener(KafkaProcessor.INPUT)
     public void onStringEventListener(@Payload String eventString){
 
     }
 
     @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverCanceled_(@Payload Canceled canceled){
+    @Transactional
+    public void wheneverEnded_UpdateConference(@Payload Deleted deleted){
 
-        if(canceled.isMe()){
-            Optional<Room> room = roomRepository.findById(canceled.getRoomId());
-            System.out.println("##### listener  : " + canceled.toJson());
-            if (room.isPresent()){
-                room.get().setStatus("Available");//회의실 예약이 취소되어 예약이 가능해짐.
-                roomRepository.save(room.get());
-            }
-        }
-    }
-    @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverReserved_(@Payload Reserved reserved){
-
-        if(reserved.isMe()){
-            Optional<Room> room = roomRepository.findById(reserved.getRoomId());
-            System.out.println("##### listener  : " + reserved.toJson());
-            if (room.isPresent()){
-                room.get().setStatus("Reserved");//회의실이 예약됨.
-                roomRepository.save(room.get());
-            }
-        }
-    }
-    @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverUserChecked_(@Payload UserChecked userChecked){
-
-        if(userChecked.isMe()){
-            Optional<Room> room = roomRepository.findById(userChecked.getRoomId());
-            System.out.println("##### listener  : " + userChecked.toJson());
-            if(room.isPresent()){
-                room.get().setStatus("Started");//회의가 시작됨.
-                roomRepository.save(room.get());
-            }
-        }
-    }
-    @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverEnded_(@Payload Ended ended){
-
-        if(ended.isMe()){
-            Optional<Room> room = roomRepository.findById(ended.getRoomId());
-            System.out.println("##### listener  : " + ended.toJson());
-            if(room.isPresent()){
-                room.get().setStatus("Available");//회의가 종료됨.
-                roomRepository.save(room.get());
+        if(deleted.isMe()){
+            List<Review> reviewList = reviewRepository.findAllByRoomId(deleted.getId());
+            System.out.println("##### listener  : " + deleted.toJson());
+            for(Review review:reviewList){
+                reviewRepository.deleteById(review.getId());
             }
         }
     }
 
 }
-
 ```
 
 
 - 적용 후 REST API의 테스트를 통해 정상적으로 작동함을 알 수 있었다.
-- 회의실 등록(Added) 후 결과
+- 회의실 등록(Added)후 리뷰 등록(Registered) 결과
+<img width="850" alt="스크린샷 2021-03-04 오전 10 21 07" src="https://user-images.githubusercontent.com/43164924/109895867-57ec9c00-7cd3-11eb-8f8b-18fab4dd7648.png">
 
-<img width="1116" alt="스크린샷 2021-03-01 오후 6 38 24" src="https://user-images.githubusercontent.com/43164924/109479041-5184d700-7abd-11eb-84d6-782c4b94779e.png">
-
-
-- 회의 예약(Reserved) 후 결과
-
-<img width="1116" alt="스크린샷 2021-03-01 오후 6 37 36" src="https://user-images.githubusercontent.com/43164924/109478970-3ade8000-7abd-11eb-836a-e07a7b3dec80.png">
+- 회의실 삭제(Deleted) 후 결과 : 해당 회의실에 대한 리뷰도 삭제됨
+<img width="850" alt="스크린샷 2021-03-04 오전 10 23 26" src="https://user-images.githubusercontent.com/43164924/109896077-ab5eea00-7cd3-11eb-8936-3881c4937943.png">
 
 ## Gateway 적용
 API Gateway를 통해 마이크로 서비스들의 진입점을 하나로 진행하였다.
@@ -221,6 +255,10 @@ spring:
           uri: http://localhost:8084
           predicates:
             - Path= /reserveTables/**
+        - id: review
+          uri: http://localhost:8085
+          predicates:
+            - Path=/reviews/**
       globalcors:
         corsConfigurations:
           '[/**]':
@@ -256,6 +294,10 @@ spring:
           uri: http://schedule:8080
           predicates:
             - Path= /reserveTables/**
+        - id: review
+          uri: http://review:8080
+          predicates:
+            - Path=/reviews/**
       globalcors:
         corsConfigurations:
           '[/**]':
@@ -273,127 +315,134 @@ server:
 ```
 
 ## Polyglot Persistence
-- Conference 서비스의 경우, 다른 서비스들이 h2 저장소를 이용한 것과는 다르게 hsql을 이용하였다. 
+- Review 서비스의 경우, 다른 서비스들이 h2 저장소를 이용한 것과는 다르게 hsql을 이용하였다. 
 - 이 작업을 통해 서비스들이 각각 다른 데이터베이스를 사용하더라도 전체적인 기능엔 문제가 없음을, 즉 Polyglot Persistence를 충족하였다.
 
-<img width="446" alt="스크린샷 2021-03-01 오후 6 43 02" src="https://user-images.githubusercontent.com/43164924/109479663-f6071900-7abd-11eb-8c22-eda690cadea4.png">
+<img width="324" alt="스크린샷 2021-03-04 오전 10 26 35" src="https://user-images.githubusercontent.com/43164924/109896341-1c9e9d00-7cd4-11eb-8f93-98daccec6d53.png">
 
 ## 동기식 호출(Req/Res 방식)과 Fallback 처리
 
-- conference 서비스의 external/ReserveService.java 내에 예약한 사용자가 맞는지 확인하는 Service 대행 인터페이스(Proxy)를 FeignClient를 이용하여 구현하였다.
+- review 서비스의 external/RoomService.java 내에 리뷰를 작성하려는 회의실이 실제로 존재하는지 확인하는 Service 대행 인터페이스(Proxy)를 FeignClient를 이용하여 구현하였다.
 
 ```java
-@FeignClient(name="reserve", url="${api.reserve.url}")
-public interface ReserveService {
+@FeignClient(name="room", url="${api.room.url}")
+public interface RoomService {
 
-    @RequestMapping(method= RequestMethod.GET, path="/reserves/check")
-    public String userCheck(@RequestBody Reserve reserve);
+    @RequestMapping(method= RequestMethod.GET, path="/rooms/check")
+    public String search(@RequestBody Room room);
 
 }
 ```
-- conference 서비스의 Conference.java 내에 사용자 확인 후 결과에 따라 회의 시작을 진행할지, 진행하지 않을지 결정.(@PrePersist)
+- review 서비스의 Review.java 내에 회의실 존재 확인 후 결과에 따라 리뷰를 등록할지,등록하지 않을지 결정.(@PrePersist)
 ```java
 @PrePersist
     public void onPrePersist(){
-        /*Started started = new Started();
-        BeanUtils.copyProperties(this, started);
-        started.publishAfterCommit();*/
+        RoomChecked roomChecked = new RoomChecked();
+        BeanUtils.copyProperties(this, roomChecked);
+        roomChecked.publishAfterCommit();
 
         //Following code causes dependency to external APIs
         // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
 
-        meetingroom.external.Reserve reserve = new meetingroom.external.Reserve();
+        meetingroom.external.Room room = new meetingroom.external.Room();
+        room.setId(roomId);
         // mappings goes here
-        reserve.setId(reserveId);
-        reserve.setUserId(userId);
-        reserve.setRoomId(roomId);
-        String result = ConferenceApplication.applicationContext.getBean(meetingroom.external.ReserveService.class).userCheck(reserve);
-
+        String result=ReviewApplication.applicationContext.getBean(meetingroom.external.RoomService.class)
+            .search(room);
         if(result.equals("valid")){
             System.out.println("Success!");
         }
         else{
-            /// usercheck가 유효하지 않을 때 강제로 예외 발생
-                System.out.println("FAIL!! InCorrect User or Incorrect Resevation");
-                Exception ex = new Exception();
-                ex.notify();
+            System.out.println("FAIL!! There is no room!!");
+            Exception ex = new Exception();
+            ex.notify();
         }
     }
 ```
-- 동기식 호출에서는 호출 시간에 따른 커플링이 발생하여, Reserve 시스템에 장애가 나면 회의 시작을 할 수가 없다. (Reserve 시스템에서 예약한 사용자인지를 확인하므로)
-  - Reserve 서비스를 중지. <img width="316" alt="스크린샷 2021-03-01 오후 7 39 17" src="https://user-images.githubusercontent.com/43164924/109486134-d247d100-7ac5-11eb-897a-54091bb13381.png">
-  - conference 서비스에서 회의 시작 시 에러 발생. <img width="1116" alt="스크린샷 2021-03-01 오후 7 41 00" src="https://user-images.githubusercontent.com/43164924/109486323-0fac5e80-7ac6-11eb-99e2-0ee7cc1f86e8.png">
-  - reserve 서비스 재기동 후 다시 회의 시작 요청. <img width="1116" alt="스크린샷 2021-03-01 오후 7 44 31" src="https://user-images.githubusercontent.com/43164924/109486682-8d706a00-7ac6-11eb-81c8-980c0a612005.png">
+- 동기식 호출에서는 호출 시간에 따른 커플링이 발생하여, Room 시스템에 장애가 나면 리뷰 등록을 할 수가 없다. (Room 서비스에서 실제로 회의실이 존재하는지를 확인하므로)
+  - Room 서비스를 중지.<img width="334" alt="스크린샷 2021-03-04 오전 10 31 30" src="https://user-images.githubusercontent.com/43164924/109896733-cc740a80-7cd4-11eb-9855-9e9df5b868b3.png">
+  - Review 서비스에서 리뷰 등록 시 에러 발생. <img width="850" alt="스크린샷 2021-03-04 오전 10 32 18" src="https://user-images.githubusercontent.com/43164924/109896791-e877ac00-7cd4-11eb-97c9-00a026eadd20.png">
+  - Room 서비스 재기동 후 다시 리뷰 등록 요청. <img width="850" alt="스크린샷 2021-03-04 오전 10 33 43" src="https://user-images.githubusercontent.com/43164924/109896887-1b21a480-7cd5-11eb-8298-67424954d605.png">
+
 
 ## 비동기식 호출 (Pub/Sub 방식)
 
-- reserve 서비스 내 Reserve.java에서 아래와 같이 서비스 Pub 구현
+- review 서비스 내 Review.java에서 아래와 같이 서비스 Pub 구현
 
 ```java
 @Entity
-@Table(name="Reserve_table")
-public class Reserve {
+@Table(name="Review_table")
+public class Review {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
-    private String userId;
     private Long roomId;
-    private String status;
+    private String userId;
+    private Integer score;
+    private String comment;
+    private Long reserveId;
 
     //...
-
     @PostPersist
     public void onPostPersist(){
-        Reserved reserved = new Reserved();
-        BeanUtils.copyProperties(this, reserved);
-        reserved.publishAfterCommit();
+        Registered registered = new Registered();
+        BeanUtils.copyProperties(this, registered);
+        registered.publishAfterCommit();
     }
+    //...
 }
+
 ```
 
-- room 서비스 내 PolicyHandler.java 에서 아래와 같이 Sub 구현
+- reserve 서비스 내 PolicyHandler.java 에서 아래와 같이 Sub 구현
 
 ```java
 @Service
 public class PolicyHandler{
     @Autowired
-    RoomRepository roomRepository;
-
-    //...
+    ReserveRepository reserveRepository;
     @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverReserved_(@Payload Reserved reserved){
+    public void onStringEventListener(@Payload String eventString){
 
-        if(reserved.isMe()){
-            Optional<Room> room = roomRepository.findById(reserved.getRoomId());
-            System.out.println("##### listener  : " + reserved.toJson());
-            if (room.isPresent()){
-                room.get().setStatus("Reserved");//회의실이 예약됨.
-                roomRepository.save(room.get());
+    }
+    @StreamListener(KafkaProcessor.INPUT)
+    @Transactional
+    public void wheneverEnded_UpdateConference(@Payload Registered registered){
+
+        if(registered.isMe()){
+            System.out.println("##### listener  : " + registered.toJson());
+            Optional<Reserve> reserve=reserveRepository.findById(registered.getReserveId());
+            if(reserve.isPresent()){
+                reserve.get().setStatus("Ended");
+                reserveRepository.save(reserve.get());
             }
         }
     }
-  }
+}
 ```
 - 비동기 호출은 다른 서비스 하나가 비정상이어도 해당 메세지를 다른 메시지 큐에서 보관하고 있기에, 서비스가 다시 정상으로 돌아오게 되면 그 메시지를 처리하게 된다.
-  - reserve 서비스와 room 서비스가 둘 다 정상 작동을 하고 있을 경우, 이상이 없이 잘 된다. <img width="1116" alt="스크린샷 2021-03-01 오후 8 01 56" src="https://user-images.githubusercontent.com/43164924/109488499-fc4ec280-7ac8-11eb-9a52-77d6e4939417.png">
-  - room 서비스를 내렸다. <img width="298" alt="스크린샷 2021-03-01 오후 8 02 28" src="https://user-images.githubusercontent.com/43164924/109488553-0ffa2900-7ac9-11eb-8d08-1e7d7ea7aff3.png">
-  - reserve 서비스를 이용해 예약을 하여도 문제가 없이 동작한다. <img width="906" alt="스크린샷 2021-03-01 오후 8 03 47" src="https://user-images.githubusercontent.com/43164924/109488704-3e780400-7ac9-11eb-80ee-ad1714bf8991.png">
+  - reserve 서비스와 review 서비스가 둘 다 정상 작동을 하고 있을 경우, 이상이 없이 잘 된다. <img width="850" alt="스크린샷 2021-03-04 오후 1 11 17" src="https://user-images.githubusercontent.com/43164924/109910321-326b8c80-7ceb-11eb-8b5c-167f51dd573f.png">
+  - reserve 서비스를 내렸다. <img width="318" alt="스크린샷 2021-03-04 오전 10 58 09" src="https://user-images.githubusercontent.com/43164924/109899012-86b94100-7cd8-11eb-98f2-16af16b6cf65.png">
+  - review 서비스를 이용해 리뷰 등록을 하여도 문제가 없이 동작한다. <img width="850" alt="스크린샷 2021-03-04 오전 10 58 44" src="https://user-images.githubusercontent.com/43164924/109899063-99cc1100-7cd8-11eb-9f2b-85a5583a4ddb.png">
 
 ## CQRS
 
 viewer인 schedule 서비스를 별도로 구현하여 아래와 같이 view를 출력한다.
+- Added 수행 후 schedule (회의실 등록)
+<img width="850" alt="스크린샷 2021-03-04 오전 11 14 38" src="https://user-images.githubusercontent.com/43164924/109900492-d13bbd00-7cda-11eb-91e7-a9f3bf314050.png">
 - Reserved 수행 후 schedule (예약 진행)
-<img width="906" alt="스크린샷 2021-03-01 오후 8 07 43" src="https://user-images.githubusercontent.com/43164924/109489147-ccec8580-7ac9-11eb-86f4-24d7b6db92ac.png">
-
+<img width="850" alt="스크린샷 2021-03-04 오전 11 15 14" src="https://user-images.githubusercontent.com/43164924/109900550-e7497d80-7cda-11eb-9275-cf9a051afce2.png">
 - Ended 수행 후 schedule (회의 시작 후, 회의 종료)
-<img width="906" alt="스크린샷 2021-03-01 오후 8 08 49" src="https://user-images.githubusercontent.com/43164924/109489279-f2798f00-7ac9-11eb-8ee3-55ca97c0b27b.png">
-
+<img width="850" alt="스크린샷 2021-03-04 오전 11 32 31" src="https://user-images.githubusercontent.com/43164924/109902114-50ca8b80-7cdd-11eb-89cf-2d3c10391bf4.png">
+- Registered 수행 후 schedule (리뷰 등록)(premium)
+<img width="850" alt="스크린샷 2021-03-04 오후 1 22 28" src="https://user-images.githubusercontent.com/43164924/109911030-ace8dc00-7cec-11eb-89d2-e0221fdc3da2.png">
 - 다시 Reserved 수행 후 schedule (예약 진행)
-<img width="906" alt="스크린샷 2021-03-01 오후 8 09 26" src="https://user-images.githubusercontent.com/43164924/109489335-09b87c80-7aca-11eb-8db2-b56a049521c9.png">
-
+<img width="850" alt="스크린샷 2021-03-04 오후 1 23 24" src="https://user-images.githubusercontent.com/43164924/109911105-d0ac2200-7cec-11eb-9ff2-61882995f44a.png">
 - Canceled 수행 후 schedule (예약 취소)
-<img width="906" alt="스크린샷 2021-03-01 오후 8 10 53" src="https://user-images.githubusercontent.com/43164924/109489448-3c627500-7aca-11eb-8f63-894d2d78ece4.png">
+<img width="850" alt="스크린샷 2021-03-04 오후 1 24 20" src="https://user-images.githubusercontent.com/43164924/109911180-efaab400-7cec-11eb-86aa-98265cc917d2.png">
+- Deleted 수행 후 schedule (회의실 삭제)
+<img width="850" alt="스크린샷 2021-03-04 오후 1 18 01" src="https://user-images.githubusercontent.com/43164924/109910694-0ef51180-7cec-11eb-9aab-a38515e982b4.png">
 
 # 운영
 ## CI/CD 설정
@@ -459,7 +508,7 @@ kubectl get all
 
 - Kubectl Deploy 결과 확인  
 
-  <img width="556" alt="스크린샷 2021-02-28 오후 12 47 12" src="https://user-images.githubusercontent.com/33116855/109407331-52394280-79c3-11eb-8283-ba98b2899f69.png">
+  <img width="556" alt="스크린샷 2021-02-28 오후 12 47 12" src="https://user-images.githubusercontent.com/33116855/109407331-52394280-79c3-11eb-8283-ba98b2899f69.png">
 
 - Kubernetes에서 서비스 생성하기 (Docker 생성이기에 Port는 8080이며, Gateway는 LoadBalancer로 생성)
 
@@ -474,7 +523,7 @@ kubectl get all
 
 - Kubectl Expose 결과 확인  
 
-  <img width="646" alt="스크린샷 2021-02-28 오후 12 47 50" src="https://user-images.githubusercontent.com/33116855/109407339-5feec800-79c3-11eb-9f3f-18d9d2b812f0.png">
+  <img width="646" alt="스크린샷 2021-02-28 오후 12 47 50" src="https://user-images.githubusercontent.com/33116855/109407339-5feec800-79c3-11eb-9f3f-18d9d2b812f0.png">
 
 
   
@@ -486,7 +535,7 @@ siege -c10 -t60S -r10 -v --content-type "application/json" 'http://52.231.13.109
 ```
 - Readiness가 설정되지 않은 yml 파일로 배포 진행  
 
-  <img width="871" alt="스크린샷 2021-02-28 오후 1 52 52" src="https://user-images.githubusercontent.com/33116855/109408363-4b62fd80-79cc-11eb-9014-638a09b545c1.png">
+  <img width="871" alt="스크린샷 2021-02-28 오후 1 52 52" src="https://user-images.githubusercontent.com/33116855/109408363-4b62fd80-79cc-11eb-9014-638a09b545c1.png">
 
 ```
 kubectl apply -f deployment.yml
@@ -494,22 +543,22 @@ kubectl apply -f deployment.yml
 
 - 아래 그림과 같이, Kubernetes가 준비가 되지 않은 delivery pod에 요청을 보내서 siege의 Availability 가 100% 미만으로 떨어짐 
 
-  <img width="480" alt="스크린샷 2021-02-28 오후 2 30 37" src="https://user-images.githubusercontent.com/33116855/109408933-97fd0780-79d1-11eb-8ec6-f17d44161eb5.png">
+  <img width="480" alt="스크린샷 2021-02-28 오후 2 30 37" src="https://user-images.githubusercontent.com/33116855/109408933-97fd0780-79d1-11eb-8ec6-f17d44161eb5.png">
 
 - Readiness가 설정된 yml 파일로 배포 진행  
 
-  <img width="779" alt="스크린샷 2021-02-28 오후 2 32 51" src="https://user-images.githubusercontent.com/33116855/109408971-e4484780-79d1-11eb-8989-cd680e962eff.png">
+  <img width="779" alt="스크린샷 2021-02-28 오후 2 32 51" src="https://user-images.githubusercontent.com/33116855/109408971-e4484780-79d1-11eb-8989-cd680e962eff.png">
 
 ```
 kubectl apply -f deployment.yml
 ```
 - 배포 중 pod가 2개가 뜨고, 새롭게 띄운 pod가 준비될 때까지, 기존 pod가 유지됨을 확인  
   
-  <img width="764" alt="스크린샷 2021-02-28 오후 2 34 54" src="https://user-images.githubusercontent.com/33116855/109408992-2b363d00-79d2-11eb-8024-07aeade9e928.png">
+  <img width="764" alt="스크린샷 2021-02-28 오후 2 34 54" src="https://user-images.githubusercontent.com/33116855/109408992-2b363d00-79d2-11eb-8024-07aeade9e928.png">
   
 - siege 가 중단되지 않고, Availability가 높아졌음을 확인하여 무정지 재배포가 됨을 확인함  
   
-  <img width="507" alt="스크린샷 2021-02-28 오후 2 48 28" src="https://user-images.githubusercontent.com/33116855/109409209-093dba00-79d4-11eb-9793-d1a7cdbe55f0.png">
+  <img width="507" alt="스크린샷 2021-02-28 오후 2 48 28" src="https://user-images.githubusercontent.com/33116855/109409209-093dba00-79d4-11eb-9793-d1a7cdbe55f0.png">
 
 
 ## 오토스케일 아웃
@@ -517,7 +566,7 @@ kubectl apply -f deployment.yml
 
   - 단, 부하가 제대로 걸리기 위해서, reserve 서비스의 리소스를 줄여서 재배포한다.
 
-  <img width="703" alt="스크린샷 2021-02-28 오후 2 51 19" src="https://user-images.githubusercontent.com/33116855/109409248-7d785d80-79d4-11eb-95ce-4af79b9a7e72.png">
+  <img width="703" alt="스크린샷 2021-02-28 오후 2 51 19" src="https://user-images.githubusercontent.com/33116855/109409248-7d785d80-79d4-11eb-95ce-4af79b9a7e72.png">
 
 - reserve 시스템에 replica를 자동으로 늘려줄 수 있도록 HPA를 설정한다. 설정은 CPU 사용량이 15%를 넘어서면 replica를 10개까지 늘려준다.
 
@@ -527,12 +576,12 @@ kubectl autoscale deploy reserve --min=1 --max=10 --cpu-percent=15
 
 - hpa 설정 확인  
 
-  <img width="631" alt="스크린샷 2021-02-28 오후 2 56 50" src="https://user-images.githubusercontent.com/33116855/109409360-6a19c200-79d5-11eb-90a4-fc5c5030e92b.png">
+  <img width="631" alt="스크린샷 2021-02-28 오후 2 56 50" src="https://user-images.githubusercontent.com/33116855/109409360-6a19c200-79d5-11eb-90a4-fc5c5030e92b.png">
 
 - hpa 상세 설정 확인  
 
-  <img width="1327" alt="스크린샷 2021-02-28 오후 2 57 37" src="https://user-images.githubusercontent.com/33116855/109409362-6ede7600-79d5-11eb-85ec-85c59bdefcaf.png>
-  <img width="691" alt="스크린샷 2021-02-28 오후 2 57 53" src="https://user-images.githubusercontent.com/33116855/109409364-700fa300-79d5-11eb-8077-70d5cddf7505.png">
+  <img width="1327" alt="스크린샷 2021-02-28 오후 2 57 37" src="https://user-images.githubusercontent.com/33116855/109409362-6ede7600-79d5-11eb-85ec-85c59bdefcaf.png>
+  <img width="691" alt="스크린샷 2021-02-28 오후 2 57 53" src="https://user-images.githubusercontent.com/33116855/109409364-700fa300-79d5-11eb-8077-70d5cddf7505.png">
 
   
 - siege를 활용해서 워크로드를 2분간 걸어준다. (Cloud 내 siege pod에서 부하줄 것)
@@ -570,22 +619,22 @@ watch kubectl get all
 
 - reserve 서비스에 liveness가 적용된 것을 확인  
 
-  <img width="824" alt="스크린샷 2021-02-28 오후 3 31 53" src="https://user-images.githubusercontent.com/33116855/109409951-1bbaf200-79da-11eb-9a39-a585224c3ca0.png">
+  <img width="824" alt="스크린샷 2021-02-28 오후 3 31 53" src="https://user-images.githubusercontent.com/33116855/109409951-1bbaf200-79da-11eb-9a39-a585224c3ca0.png">
 
 - reserve 서비스에 liveness가 발동되었고, 8090 포트에 응답이 없기에 Restart가 발생함   
 
-  <img width="643" alt="스크린샷 2021-02-28 오후 3 34 35" src="https://user-images.githubusercontent.com/33116855/109409994-7c4a2f00-79da-11eb-8ab7-e542e50fd929.png">
+  <img width="643" alt="스크린샷 2021-02-28 오후 3 34 35" src="https://user-images.githubusercontent.com/33116855/109409994-7c4a2f00-79da-11eb-8ab7-e542e50fd929.png">
 
 
 ## ConfigMap 적용
 - conference 서비스의 application.yaml에 ConfigMap 적용 대상 항목을 추가한다.
 
-  <img width="576" alt="스크린샷 2021-03-02 오전 11 20 08" src="https://user-images.githubusercontent.com/33116855/109586783-424b6b00-7b49-11eb-8e1c-b1d23d7ef463.png">
+  <img width="576" alt="스크린샷 2021-03-02 오전 11 20 08" src="https://user-images.githubusercontent.com/33116855/109586783-424b6b00-7b49-11eb-8e1c-b1d23d7ef463.png">
 
 - conference 서비스의 deployment.yaml에 ConfigMap 적용 대상 항목을 추가한다.
 
 
-  <img width="546" alt="스크린샷 2021-03-02 오전 11 21 33" src="https://user-images.githubusercontent.com/33116855/109586890-73c43680-7b49-11eb-9622-46f9a8a45150.png">
+  <img width="546" alt="스크린샷 2021-03-02 오전 11 21 33" src="https://user-images.githubusercontent.com/33116855/109586890-73c43680-7b49-11eb-9622-46f9a8a45150.png">
 
 - ConfigMap 생성하기
 ```
@@ -598,11 +647,11 @@ kubectl create configmap apiurl --from-literal=reserveapiurl=http://reserve:8080
 kubectl get configmap apiurl -o yaml
 ```
 
-  <img width="640" alt="스크린샷 2021-03-02 오전 11 22 06" src="https://user-images.githubusercontent.com/33116855/109586918-86d70680-7b49-11eb-8429-145a47a13ca0.png">
+  <img width="640" alt="스크린샷 2021-03-02 오전 11 22 06" src="https://user-images.githubusercontent.com/33116855/109586918-86d70680-7b49-11eb-8429-145a47a13ca0.png">
 
 - 아래 코드와 같이 Spring Boot 내에서 Configmap 환경 변수를 사용하면 정상 작동한다.
 
-   <img width="604" alt="스크린샷 2021-03-02 오전 11 23 06" src="https://user-images.githubusercontent.com/33116855/109587003-ab32e300-7b49-11eb-8282-af5c5d2b7f42.png">
+   <img width="604" alt="스크린샷 2021-03-02 오전 11 23 06" src="https://user-images.githubusercontent.com/33116855/109587003-ab32e300-7b49-11eb-8282-af5c5d2b7f42.png">
 
 
 ## 동기식 호출 / 서킷 브레이킹 / 장애격리
@@ -628,7 +677,7 @@ hystrix:
 
 - reserve에 Thread 지연 코드 삽입
 
-  <img width="702" alt="스크린샷 2021-03-01 오후 2 40 46" src="https://user-images.githubusercontent.com/33116855/109456415-22aa3900-7a9c-11eb-9a30-4e63323312c2.png">
+  <img width="702" alt="스크린샷 2021-03-01 오후 2 40 46" src="https://user-images.githubusercontent.com/33116855/109456415-22aa3900-7a9c-11eb-9a30-4e63323312c2.png">
 
 * 부하테스터 siege 툴을 통한 서킷 브레이커 동작 확인:
 - 동시사용자 100명
