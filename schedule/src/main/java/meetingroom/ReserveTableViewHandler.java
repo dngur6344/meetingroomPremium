@@ -20,6 +20,7 @@ public class ReserveTableViewHandler {
 
 
     @StreamListener(KafkaProcessor.INPUT)
+    @Transactional
     public void whenAdded_then_CREATE_1 (@Payload Added added) {
         try {
             if (added.isMe()) {
@@ -37,6 +38,7 @@ public class ReserveTableViewHandler {
         }
     }
     @StreamListener(KafkaProcessor.INPUT)
+    @Transactional
     public void whenReserved_then_UPDATE_1 (@Payload Reserved reserved) {
         try {
             if (reserved.isMe()) {
@@ -56,11 +58,12 @@ public class ReserveTableViewHandler {
         }
     }
     @StreamListener(KafkaProcessor.INPUT)
+    @Transactional
     public void whenReserved_then_UPDATE_2 (@Payload Canceled canceled) {
         try {
             if (canceled.isMe()) {
                 ReserveTable reserveTable= reserveTableRepository.findByReserveId(canceled.getId());
-                //System.out.println("$$$ reservedTable View를 위한 reserved.toJson() : " + reserved.toJson());
+                System.out.println("$$$ reservedTable View를 위한 reserved.toJson() : " + canceled.toJson());
                 reserveTable.setReserveId(null);
                 reserveTable.setStatus("Available");
                 reserveTable.setUserId(null);
@@ -73,6 +76,7 @@ public class ReserveTableViewHandler {
         }
     }
     @StreamListener(KafkaProcessor.INPUT)
+    @Transactional
     public void whenReserved_then_UPDATE_3 (@Payload Ended ended) {
         try {
             if (ended.isMe()) {
@@ -92,11 +96,14 @@ public class ReserveTableViewHandler {
         }
     }
     @StreamListener(KafkaProcessor.INPUT)
-    public void whenReserved_then_UPDATE_4 (@Payload Registered registered) {
+    @Transactional
+    public void whenReserved_then_UPDATE_4 (@Payload Registered registered) {//해당 회의실에 대한 가장 최근 리뷰를 보여줌
         try {
             if (registered.isMe()) {
                 ReserveTable reserveTable = reserveTableRepository.findByRoomId(registered.getRoomId());
+                System.out.println("$$$ reservedTable View를 위한 reserved.toJson() : " + registered.toJson());
                 reserveTable.setScore(registered.getScore());
+                reserveTable.setComment(registered.getComment());
                 // view 객체에 이벤트의 eventDirectValue 를 set 함
                 // view 레파지 토리에 save
                 reserveTableRepository.save(reserveTable);

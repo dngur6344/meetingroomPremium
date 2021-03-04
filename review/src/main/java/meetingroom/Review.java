@@ -14,6 +14,8 @@ public class Review {
     private Long roomId;
     private String userId;
     private Integer score;
+    private String comment;
+    private Long reserveId;
 
     @PrePersist
     public void onPrePersist(){
@@ -75,7 +77,19 @@ public class Review {
         this.score = score;
     }
 
+    public String getComment() {
+        return comment;
+    }
 
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
 
+    public Long getReserveId() {
+        return reserveId;
+    }
 
+    public void setReserveId(Long reserveId) {
+        this.reserveId = reserveId;
+    }
 }

@@ -6,6 +6,7 @@ public class Registered extends AbstractEvent {
     private Long roomId;
     private String userId;
     private Integer score;
+    private String comment;
 
 
     public Registered(){
@@ -39,5 +40,13 @@ public class Registered extends AbstractEvent {
 
     public void setScore(Integer score) {
         this.score = score;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
     }
 }
