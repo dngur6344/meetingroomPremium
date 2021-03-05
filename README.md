@@ -653,7 +653,7 @@ kubectl get configmap apiurl -o yaml
 
 - Hystrix 를 설정:  요청처리 쓰레드에서 처리시간이 610 밀리가 넘어서기 시작하여 어느정도 유지되면 CB 회로가 닫히도록 설정
 
-- conference의 Application.yaml 설정
+- review의 Application.yaml 설정
 ```
 feign:
   hystrix:
@@ -666,20 +666,22 @@ hystrix:
 
 ```
 
-- reserve에 Thread 지연 코드 삽입
+- room에 Thread 지연 코드 삽입
 
-  <img width="702" alt="스크린샷 2021-03-01 오후 2 40 46" src="https://user-images.githubusercontent.com/33116855/109456415-22aa3900-7a9c-11eb-9a30-4e63323312c2.png">
+  <img width="510" alt="스크린샷 2021-03-05 오전 10 05 25" src="https://user-images.githubusercontent.com/43164924/110053072-065c1400-7d9c-11eb-9a27-85ad83b3cb8d.png">
+
 
 * 부하테스터 siege 툴을 통한 서킷 브레이커 동작 확인:
 - 동시사용자 100명
-- 60초 동안 실시
+- 30초 동안 실시
 
 ```
-siege -c100 -t60S -r10 -v --content-type "application/json" 'http://52.141.56.203:8080/conferences POST {"roomId": "1", "userId":"1", reserveId:"1"}'
+siege -c100 -t30S -r10 -v --content-type "application/json" 'http://52.188.41.194:8080/reviews POST {"roomId":1}'
 ```
-- 부하 발생하여 CB가 발동하여 요청 실패처리하였고, 밀린 부하가 reserve에서 처리되면서 다시 conference를 받기 시작 
+- 부하 발생하여 CB가 발동하여 요청 실패처리하였고, 밀린 부하가 room에서 처리되면서 다시 review를 받기 시작 
 
-  <img width="409" alt="스크린샷 2021-03-01 오후 2 32 14" src="https://user-images.githubusercontent.com/33116855/109455911-00fc8200-7a9b-11eb-8d95-f5df5ef249fd.png">
+  <img width="704" alt="스크린샷 2021-03-05 오전 10 16 37" src="https://user-images.githubusercontent.com/43164924/110053128-24c20f80-7d9c-11eb-9bbd-9f11e948ede4.png">
+
 
 - CB 잘 적용됨을 확인
 
