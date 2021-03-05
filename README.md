@@ -556,30 +556,28 @@ kubectl apply -f deployment.yml
 ## 오토스케일 아웃
 - 서킷 브레이커는 시스템을 안정되게 운영할 수 있게 해줬지만, 사용자의 요청이 급증하는 경우, 오토스케일 아웃이 필요하다.
 
-  - 단, 부하가 제대로 걸리기 위해서, reserve 서비스의 리소스를 줄여서 재배포한다.
+  - 단, 부하가 제대로 걸리기 위해서, review 서비스의 리소스를 줄여서 재배포한다.
+  <img width="475" alt="스크린샷 2021-03-05 오전 9 15 26" src="https://user-images.githubusercontent.com/43164924/110049706-be39f300-7d95-11eb-8e60-c936bf1a7276.png">
 
-  <img width="703" alt="스크린샷 2021-02-28 오후 2 51 19" src="https://user-images.githubusercontent.com/33116855/109409248-7d785d80-79d4-11eb-95ce-4af79b9a7e72.png">
 
-- reserve 시스템에 replica를 자동으로 늘려줄 수 있도록 HPA를 설정한다. 설정은 CPU 사용량이 15%를 넘어서면 replica를 10개까지 늘려준다.
+- review 시스템에 replica를 자동으로 늘려줄 수 있도록 HPA를 설정한다. 설정은 CPU 사용량이 15%를 넘어서면 replica를 10개까지 늘려준다.
 
 ```
-kubectl autoscale deploy reserve --min=1 --max=10 --cpu-percent=15
+kubectl autoscale deploy review --min=1 --max=10 --cpu-percent=15
 ```
 
 - hpa 설정 확인  
 
-  <img width="631" alt="스크린샷 2021-02-28 오후 2 56 50" src="https://user-images.githubusercontent.com/33116855/109409360-6a19c200-79d5-11eb-90a4-fc5c5030e92b.png">
+  <img width="754" alt="스크린샷 2021-03-05 오전 9 16 34" src="https://user-images.githubusercontent.com/43164924/110049772-dad62b00-7d95-11eb-8500-ded5d92069f2.png">
 
 - hpa 상세 설정 확인  
-
-  <img width="1327" alt="스크린샷 2021-02-28 오후 2 57 37" src="https://user-images.githubusercontent.com/33116855/109409362-6ede7600-79d5-11eb-85ec-85c59bdefcaf.png>
-  <img width="691" alt="스크린샷 2021-02-28 오후 2 57 53" src="https://user-images.githubusercontent.com/33116855/109409364-700fa300-79d5-11eb-8077-70d5cddf7505.png">
+  <img width="1547" alt="스크린샷 2021-03-05 오전 9 18 47" src="https://user-images.githubusercontent.com/43164924/110049792-e6295680-7d95-11eb-96e9-df2b93c400ef.png">
 
   
 - siege를 활용해서 워크로드를 2분간 걸어준다. (Cloud 내 siege pod에서 부하줄 것)
 ```
 kubectl exec -it (siege POD 이름) -- /bin/bash
-siege -c1000 -t120S -r100 -v --content-type "application/json" 'http://20.194.45.67:8080/reserves POST {"userId":1, "roomId":"3"}'
+siege -c1000 -t120S -r100 -v --content-type "application/json" 'http://52.188.41.194:8080/reviews POST {"roomId":1}''
 ```
 
 - 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다.
@@ -588,11 +586,12 @@ watch kubectl get all
 ```
 - 스케일 아웃이 자동으로 되었음을 확인
 
-  <img width="656" alt="스크린샷 2021-02-28 오후 3 01 47" src="https://user-images.githubusercontent.com/33116855/109409423-eb715480-79d5-11eb-8b2c-0a0417df9718.png">
+  <img width="722" alt="스크린샷 2021-03-05 오전 9 30 20" src="https://user-images.githubusercontent.com/43164924/110049854-06591580-7d96-11eb-86b5-13c045b2e04f.png">
+
 
 - 오토스케일링에 따라 Siege 성공률이 높은 것을 확인 할 수 있다.  
 
-  <img width="412" alt="스크린샷 2021-02-28 오후 3 03 18" src="https://user-images.githubusercontent.com/33116855/109409445-18be0280-79d6-11eb-9c6f-4632f8a88d1d.png">
+  <img width="646" alt="스크린샷 2021-03-05 오전 9 31 50" src="https://user-images.githubusercontent.com/43164924/110049872-0ce78d00-7d96-11eb-83b5-82e5386a1aa6.png">
 
 ## Self-healing (Liveness Probe)
 - reserve 서비스의 yml 파일에 liveness probe 설정을 바꾸어서, liveness probe 가 동작함을 확인
