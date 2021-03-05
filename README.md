@@ -594,7 +594,7 @@ watch kubectl get all
   <img width="646" alt="스크린샷 2021-03-05 오전 9 31 50" src="https://user-images.githubusercontent.com/43164924/110049872-0ce78d00-7d96-11eb-83b5-82e5386a1aa6.png">
 
 ## Self-healing (Liveness Probe)
-- reserve 서비스의 yml 파일에 liveness probe 설정을 바꾸어서, liveness probe 가 동작함을 확인
+- review 서비스의 yml 파일에 liveness probe 설정을 바꾸어서, liveness probe 가 동작함을 확인
 
 - liveness probe 옵션을 추가하되, 서비스 포트가 아닌 8090으로 설정, readiness probe 미적용
 ```
@@ -608,13 +608,13 @@ watch kubectl get all
             failureThreshold: 5
 ```
 
-- reserve 서비스에 liveness가 적용된 것을 확인  
+- review 서비스에 liveness가 적용된 것을 확인  
 
-  <img width="824" alt="스크린샷 2021-02-28 오후 3 31 53" src="https://user-images.githubusercontent.com/33116855/109409951-1bbaf200-79da-11eb-9a39-a585224c3ca0.png">
+  <img width="1264" alt="스크린샷 2021-03-05 오전 9 43 57" src="https://user-images.githubusercontent.com/43164924/110050544-761bd000-7d97-11eb-8595-ed06296dfe4f.png">
 
-- reserve 서비스에 liveness가 발동되었고, 8090 포트에 응답이 없기에 Restart가 발생함   
 
-  <img width="643" alt="스크린샷 2021-02-28 오후 3 34 35" src="https://user-images.githubusercontent.com/33116855/109409994-7c4a2f00-79da-11eb-8ab7-e542e50fd929.png">
+- review 서비스에 liveness가 발동되었고, 8090 포트에 응답이 없기에 Restart가 발생함   
+  <img width="563" alt="스크린샷 2021-03-05 오전 9 43 00" src="https://user-images.githubusercontent.com/43164924/110050575-88960980-7d97-11eb-8f7c-a7e5ae3a2c00.png">
 
 
 ## ConfigMap 적용
