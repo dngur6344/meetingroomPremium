@@ -613,8 +613,8 @@ watch kubectl get all
   <img width="1264" alt="스크린샷 2021-03-05 오전 9 43 57" src="https://user-images.githubusercontent.com/43164924/110050544-761bd000-7d97-11eb-8595-ed06296dfe4f.png">
 
 
-- review 서비스에 liveness가 발동되었고, 8090 포트에 응답이 없기에 Restart가 발생함   
-  <img width="563" alt="스크린샷 2021-03-05 오전 9 43 00" src="https://user-images.githubusercontent.com/43164924/110050575-88960980-7d97-11eb-8f7c-a7e5ae3a2c00.png">
+- review 서비스에 liveness가 발동되었고, 8090 포트에 응답이 없기에 Restart가 발생함(Restarted count가 3이 됨)
+  <img width="511" alt="스크린샷 2021-03-05 오전 11 21 22" src="https://user-images.githubusercontent.com/43164924/110058072-11677200-7da5-11eb-9a5d-dfdc6a2577da.png">
 
 
 ## ConfigMap 적용
