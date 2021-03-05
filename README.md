@@ -622,7 +622,8 @@ watch kubectl get all
 - <img width="150" alt="스크린샷 2021-03-05 오전 9 47 22" src="https://user-images.githubusercontent.com/43164924/110050793-022df780-7d98-11eb-98a0-363187208005.png">
 
 
-- Review 서비스의 deployment.yaml에 ConfigMap 적용 대상 항목을 추가한다.<img width="418" alt="스크린샷 2021-03-05 오전 9 47 36" src="https://user-images.githubusercontent.com/43164924/110050810-0823d880-7d98-11eb-9cd3-c0b2100d5752.png">
+- Review 서비스의 deployment.yaml에 ConfigMap 적용 대상 항목을 추가한다.
+- <img width="418" alt="스크린샷 2021-03-05 오전 9 47 36" src="https://user-images.githubusercontent.com/43164924/110050810-0823d880-7d98-11eb-9cd3-c0b2100d5752.png">
 
 - ConfigMap 생성하기
 ```
