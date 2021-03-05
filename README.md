@@ -618,14 +618,12 @@ watch kubectl get all
 
 
 ## ConfigMap 적용
-- conference 서비스의 application.yaml에 ConfigMap 적용 대상 항목을 추가한다.
-
-  <img width="576" alt="스크린샷 2021-03-02 오전 11 20 08" src="https://user-images.githubusercontent.com/33116855/109586783-424b6b00-7b49-11eb-8e1c-b1d23d7ef463.png">
-
-- conference 서비스의 deployment.yaml에 ConfigMap 적용 대상 항목을 추가한다.
+- Review 서비스의 application.yaml에 ConfigMap 적용 대상 항목을 추가한다.
+  <img width="150" alt="스크린샷 2021-03-05 오전 9 47 22" src="https://user-images.githubusercontent.com/43164924/110050793-022df780-7d98-11eb-98a0-363187208005.png">
 
 
-  <img width="546" alt="스크린샷 2021-03-02 오전 11 21 33" src="https://user-images.githubusercontent.com/33116855/109586890-73c43680-7b49-11eb-9622-46f9a8a45150.png">
+- Review 서비스의 deployment.yaml에 ConfigMap 적용 대상 항목을 추가한다.
+  <img width="418" alt="스크린샷 2021-03-05 오전 9 47 36" src="https://user-images.githubusercontent.com/43164924/110050810-0823d880-7d98-11eb-9cd3-c0b2100d5752.png">
 
 - ConfigMap 생성하기
 ```
@@ -638,11 +636,13 @@ kubectl create configmap apiurl --from-literal=reserveapiurl=http://reserve:8080
 kubectl get configmap apiurl -o yaml
 ```
 
-  <img width="640" alt="스크린샷 2021-03-02 오전 11 22 06" src="https://user-images.githubusercontent.com/33116855/109586918-86d70680-7b49-11eb-8429-145a47a13ca0.png">
+  <img width="581" alt="스크린샷 2021-03-04 오후 3 45 25" src="https://user-images.githubusercontent.com/43164924/110050840-1a057b80-7d98-11eb-8e66-6ed14523fa3c.png">
+
 
 - 아래 코드와 같이 Spring Boot 내에서 Configmap 환경 변수를 사용하면 정상 작동한다.
 
-   <img width="604" alt="스크린샷 2021-03-02 오전 11 23 06" src="https://user-images.githubusercontent.com/33116855/109587003-ab32e300-7b49-11eb-8282-af5c5d2b7f42.png">
+   <img width="512" alt="스크린샷 2021-03-05 오전 9 48 17" src="https://user-images.githubusercontent.com/43164924/110050863-21c52000-7d98-11eb-8f93-e89b3e249678.png">
+
 
 
 ## 동기식 호출 / 서킷 브레이킹 / 장애격리
